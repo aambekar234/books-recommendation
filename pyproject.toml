@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "mab-books"
+version = "0.1.0"
+description = "Multi-Armed Bandit demo for book recommendations with a Streamlit frontend"
+authors = ["aambekar234 <aambekar234@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "mab_books" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+streamlit = "^1.36"
+numpy = "^1.26"
+pandas = "^2.2"
+requests = "^2.32"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+
+[tool.poetry.scripts]
+mab-books = "mab_books.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
