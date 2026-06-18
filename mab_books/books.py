@@ -70,6 +70,23 @@ def fetch_books(subject: str, limit: int = 8, timeout: float = 6.0) -> list[Book
     return _fallback_for(subject, limit)
 
 
+def fetch_mixed_catalogue(subjects: list[str], per_subject: int = 4) -> list[Book]:
+    """Fetch ``per_subject`` books for each subject and combine them.
+
+    The contextual recommender needs a catalogue spanning several genres so it
+    can learn to match readers to the genre they prefer. Duplicate books (same
+    key) across subjects are dropped, preserving first-seen order.
+    """
+    catalogue: list[Book] = []
+    seen: set[str] = set()
+    for subject in subjects:
+        for book in fetch_books(subject, per_subject):
+            if book.key not in seen:
+                seen.add(book.key)
+                catalogue.append(book)
+    return catalogue
+
+
 def _work_to_book(work: dict, subject: str) -> Book | None:
     title = work.get("title")
     if not title:

@@ -12,6 +12,7 @@ streamlit = "^1.36"
 numpy = "^1.26"
 pandas = "^2.2"
 requests = "^2.32"
+vowpalwabbit = "^9.11"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2"

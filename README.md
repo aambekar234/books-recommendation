@@ -17,11 +17,20 @@ Built with **Streamlit** and managed with **Poetry**.
   fallback so the demo always runs.
 - **Simulation environment** (`mab_books/simulation.py`) that assigns each book a
   hidden click-through rate so you can watch the bandit learn and measure regret.
-- **Streamlit app** (`mab_books/app.py`) with two modes:
+- **Contextual recommender** (`mab_books/contextual.py`) powered by
+  [Vowpal Wabbit](https://vowpalwabbit.org). Unlike the context-free bandits
+  above, it uses the *reader's context* (preferred genre, mood, reading habit) to
+  personalise recommendations — different readers see different books. It uses
+  VW's `--cb_explore_adf` learner with `-q UA` feature interactions and a
+  matching synthetic environment (`mab_books/contextual_simulation.py`).
+- **Streamlit app** (`mab_books/app.py`) with three modes:
   - **Simulation** — run thousands of rounds and chart cumulative reward, regret,
     and how often each book was shown.
   - **Interactive** — *you* are the user: the bandit recommends a book, you click
     👍/👎, and the algorithm updates live.
+  - **Contextual (VW)** — set your reader context and watch Vowpal Wabbit adapt
+    its recommendations to your behaviour, or run an experiment over many
+    synthetic readers and see regret flatten as it learns each reader's taste.
 
 ## Setup
 
@@ -47,6 +56,10 @@ Everything is set from the sidebar:
 - **Algorithm** and its hyper-parameters (ε for epsilon-greedy, `c` for UCB1,
   Beta priors `alpha`/`beta` for Thompson Sampling).
 - **Random seed** for reproducible runs.
+
+The **Contextual (VW)** tab has its own controls: the exploration strategy
+(epsilon-greedy or softmax), its rate/temperature, and a toggle for personalised
+user × book feature interactions.
 
 ## Run the tests
 
