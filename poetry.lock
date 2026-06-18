@@ -1609,6 +1609,42 @@ typing-extensions = {version = ">=4.0", markers = "python_version < \"3.11\""}
 standard = ["colorama (>=0.4) ; sys_platform == \"win32\"", "httptools (>=0.8.0)", "python-dotenv (>=0.13)", "pyyaml (>=5.1)", "uvloop (>=0.15.1) ; sys_platform != \"win32\" and sys_platform != \"cygwin\" and platform_python_implementation != \"PyPy\"", "watchfiles (>=0.20)", "websockets (>=10.4)"]
 
 [[package]]
+name = "vowpalwabbit"
+version = "9.11.2"
+description = "Vowpal Wabbit Python package"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "vowpalwabbit-9.11.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:d0a7a66dc51f3a7dee4a56f0c06bac3faf20ebfc77400effb9fe17a5be73c763"},
+    {file = "vowpalwabbit-9.11.2-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:94a024965ba26f38d284d14ccd16e1654ac3ea44950cd709bf8efe95d302f456"},
+    {file = "vowpalwabbit-9.11.2-cp310-cp310-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:85a9a3e81846f3a83bb57b5edf25fe32ca44942fc403f8da827d4ac272d9095e"},
+    {file = "vowpalwabbit-9.11.2-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ae6ec63e424615c9a4e294bfcfc95a76f7eed1582347448ed2b8cc54194c9657"},
+    {file = "vowpalwabbit-9.11.2-cp310-cp310-win_amd64.whl", hash = "sha256:0e90a3d59642787ace7429ba2e6a11a90153eeacad0f6501a2d389a13139fef1"},
+    {file = "vowpalwabbit-9.11.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:b6f52749899cac0baf3f81a0b5b33fb063e733545fe598014f3f823f12c0725d"},
+    {file = "vowpalwabbit-9.11.2-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:75b3020f90d047194a6678e32bc0ebc2cb15534407a35fecfa79f5e0e2761131"},
+    {file = "vowpalwabbit-9.11.2-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:6e00edb117d80e8c41f5a3c21a1bab0d59233e812fc9f71ebf2bcbce51461ec3"},
+    {file = "vowpalwabbit-9.11.2-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:861fa8c375c8b645082662a45a3719679aa5bb19c80a604d0ddbb641f6c0cf00"},
+    {file = "vowpalwabbit-9.11.2-cp311-cp311-win_amd64.whl", hash = "sha256:3886b8f64f5833ce08e6e850306726a69244a3997ffbe6fbfdce9b637ce97e2d"},
+    {file = "vowpalwabbit-9.11.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:6ee450a5dd40a60a9a12abfe16972410e8e5d06a7ee92d8c6ec15be4a7ec0ecb"},
+    {file = "vowpalwabbit-9.11.2-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:fb962bce215757e4cd49d8d90341617416d5b360abdf476daa109b3eb4312825"},
+    {file = "vowpalwabbit-9.11.2-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:690353cc881bbd26ac81e758ed4b7fe0fecae7edb534a1a86c26246e38c5aecd"},
+    {file = "vowpalwabbit-9.11.2-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:62d117df1f5d2994130ee5b9f145d710c8198d065b061f0480ba0cab78aa3141"},
+    {file = "vowpalwabbit-9.11.2-cp312-cp312-win_amd64.whl", hash = "sha256:bdf3267faec119ce69dd147b11da234507cc1acd38a6ad61521188918e06d382"},
+    {file = "vowpalwabbit-9.11.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:46a914003e1eeb2a2c73c1234323262294d2a65981b83706789a90cb251956f6"},
+    {file = "vowpalwabbit-9.11.2-cp313-cp313-macosx_11_0_x86_64.whl", hash = "sha256:8a1270a7a42f5d469f0511a6171d13b5b227eade306b653ae9babb34f5aff405"},
+    {file = "vowpalwabbit-9.11.2-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:38f17578e13b53cb62c2f9c1d27dea78963d2c05d465ceb645837a53229a4822"},
+    {file = "vowpalwabbit-9.11.2-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:876e7b93615bc87b1af658098e9f33e007eedd698bef3b7cbfbe76635f8f4f71"},
+    {file = "vowpalwabbit-9.11.2-cp313-cp313-win_amd64.whl", hash = "sha256:2e5470796b967152e9832e04e29b424765f077ab3bea648e109bf07f5671e5ea"},
+    {file = "vowpalwabbit-9.11.2-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:25ef6e2e571d065242d31f3d3f566ba45fd8456811db7bf2e5923f799e30caf1"},
+    {file = "vowpalwabbit-9.11.2-cp314-cp314-macosx_11_0_x86_64.whl", hash = "sha256:842e4339dae02b7e60c0c7e250cadb631a5ab3d792db483e2b729b9ca7fc5b71"},
+    {file = "vowpalwabbit-9.11.2-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:de15b8d2ebfd908b63c259025d579a26dcef3cedf352b7c63737b450f9c92a61"},
+    {file = "vowpalwabbit-9.11.2-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:68b09d3db0bb8e8ff4782ca9d1503e7e043f29618bf2de560b0abd85f8463d0b"},
+    {file = "vowpalwabbit-9.11.2-cp314-cp314-win_amd64.whl", hash = "sha256:a0badad3719f8b05f87e0e62874ca38e0be96d220f43d3032656239ba8c248df"},
+    {file = "vowpalwabbit-9.11.2.tar.gz", hash = "sha256:c0ecf8d773c0174a9ab7b0f9207a2608c894bc2fbec50380ca276e89553fd379"},
+]
+
+[[package]]
 name = "watchdog"
 version = "6.0.0"
 description = "Filesystem events monitoring"
@@ -1726,4 +1762,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "1f5e1fe5f4f5c5e077e8cf55514a267f0321ac206aa9bded60d2e7586ddb8d07"
+content-hash = "26a99a3e3b47cb159c0cdeae3529d58886a1dd8125cbe40ea3f0afe79a7dacbe"

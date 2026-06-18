@@ -10,8 +10,23 @@ import pandas as pd
 import streamlit as st
 
 from mab_books.bandits import build_policy
-from mab_books.books import fetch_books
+from mab_books.books import fetch_books, fetch_mixed_catalogue
+from mab_books.contextual import (
+    GENRE_OPTIONS,
+    MOOD_OPTIONS,
+    READING_LEVEL_OPTIONS,
+    VW_AVAILABLE,
+    UserContext,
+    VowpalWabbitRecommender,
+)
+from mab_books.contextual_simulation import (
+    build_personas,
+    run_contextual_simulation,
+)
 from mab_books.simulation import assign_true_ctrs, run_simulation
+
+# Genres blended into the contextual recommender's catalogue (excludes "any").
+CONTEXTUAL_SUBJECTS = [g for g in GENRE_OPTIONS if g != "any"]
 
 st.set_page_config(page_title="MAB Book Recommender", page_icon="📚", layout="wide")
 
@@ -211,6 +226,217 @@ def render_interactive(cfg: dict, books: list) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Contextual tab — Vowpal Wabbit recommends based on *who* is asking
+# --------------------------------------------------------------------------- #
+def _contextual_controls() -> dict:
+    """Render exploration controls for the contextual recommender."""
+    c1, c2 = st.columns(2)
+    exploration = c1.selectbox(
+        "Exploration strategy", ["epsilon", "softmax"],
+        help="How VW explores: epsilon-greedy spreads ε over all books; "
+        "softmax samples proportionally to learned scores.",
+    )
+    if exploration == "epsilon":
+        explore_param = c2.slider("epsilon (exploration rate)", 0.0, 1.0, 0.2, 0.01)
+    else:
+        explore_param = c2.slider("softmax λ (temperature)", 0.5, 10.0, 4.0, 0.5)
+    interactions = st.checkbox(
+        "Personalise (interact user × book features)", value=True,
+        help="Enables VW '-q UA' so the model can learn which reader likes which "
+        "book. Turn off to see context-blind recommendations.",
+    )
+    return {
+        "exploration": exploration,
+        "explore_param": explore_param,
+        "interactions": interactions,
+    }
+
+
+def _build_recommender(books: list, ctrl: dict, seed: int) -> VowpalWabbitRecommender:
+    kwargs: dict = {
+        "exploration": ctrl["exploration"],
+        "interactions": ctrl["interactions"],
+        "rng": np.random.default_rng(seed),
+    }
+    if ctrl["exploration"] == "epsilon":
+        kwargs["epsilon"] = ctrl["explore_param"]
+    else:
+        kwargs["softmax_lambda"] = ctrl["explore_param"]
+    return VowpalWabbitRecommender(books, **kwargs)
+
+
+def _contextual_signature(books: list, ctrl: dict, seed: int) -> tuple:
+    return (tuple(b.key for b in books), tuple(sorted(ctrl.items())), seed)
+
+
+def render_contextual(cfg: dict) -> None:
+    st.subheader("🧠 Contextual recommendation (Vowpal Wabbit)")
+    st.caption(
+        "Unlike the bandits above, this recommender uses **who you are** — your "
+        "preferred genre, mood and reading habits — to decide what to show. It "
+        "learns to give *different* readers *different* books."
+    )
+
+    if not VW_AVAILABLE:
+        st.error(
+            "Vowpal Wabbit is not installed. Run `poetry install` "
+            "(or `pip install vowpalwabbit`) and reload to enable this tab."
+        )
+        return
+
+    with st.spinner("Loading a multi-genre catalogue…"):
+        books = fetch_mixed_catalogue(CONTEXTUAL_SUBJECTS, per_subject=4)
+    if not books:
+        st.error("No books available for the contextual catalogue.")
+        return
+
+    ctrl = _contextual_controls()
+    sig = _contextual_signature(books, ctrl, cfg["seed"])
+    if (
+        "ctx_recommender" not in st.session_state
+        or st.session_state.get("ctx_sig") != sig
+    ):
+        st.session_state.ctx_recommender = _build_recommender(books, ctrl, cfg["seed"])
+        st.session_state.ctx_books = books
+        st.session_state.ctx_sig = sig
+        st.session_state.ctx_rec = None
+        st.session_state.ctx_rec_context = None
+        st.session_state.ctx_need_new = True
+        st.session_state.ctx_rounds = 0
+        st.session_state.ctx_likes = 0
+
+    recommender = st.session_state.ctx_recommender
+
+    interactive_tab, experiment_tab = st.tabs(["You are the reader", "Experiment"])
+    with interactive_tab:
+        _render_contextual_interactive(recommender, books)
+    with experiment_tab:
+        _render_contextual_experiment(recommender, books, cfg["seed"])
+
+
+def _render_contextual_interactive(recommender, books: list) -> None:
+    st.markdown("#### Set your context")
+    c1, c2, c3 = st.columns(3)
+    pref_genre = c1.selectbox("Preferred genre", GENRE_OPTIONS)
+    mood = c2.selectbox("Mood", MOOD_OPTIONS)
+    reading_level = c3.selectbox("Reading habit", READING_LEVEL_OPTIONS)
+    context = UserContext(pref_genre=pref_genre, mood=mood, reading_level=reading_level)
+
+    if st.button("Reset learning", key="ctx_reset"):
+        recommender.reset()
+        st.session_state.ctx_rounds = 0
+        st.session_state.ctx_likes = 0
+        st.session_state.ctx_need_new = True
+
+    # Regenerate a recommendation when the model is fresh, the context changed,
+    # or the reader just gave feedback.
+    if (
+        st.session_state.ctx_rec is None
+        or st.session_state.ctx_rec_context != context
+        or st.session_state.ctx_need_new
+    ):
+        st.session_state.ctx_rec = recommender.recommend(context)
+        st.session_state.ctx_rec_context = context
+        st.session_state.ctx_need_new = False
+
+    rec = st.session_state.ctx_rec
+    book = rec.book
+
+    st.markdown(f"### 📖 Recommended: **{book.title}**")
+    st.write(f"*by {book.author}*  ·  genre: `{book.subject}`")
+    st.caption(f"VW showed this with probability {rec.prob:.0%} for your context.")
+    if book.cover_url:
+        st.image(book.cover_url, width=120)
+
+    c1, c2 = st.columns(2)
+    feedback = None
+    if c1.button("👍 Interested", use_container_width=True, key="ctx_like"):
+        feedback = 1.0
+    if c2.button("👎 Skip", use_container_width=True, key="ctx_skip"):
+        feedback = 0.0
+
+    if feedback is not None:
+        recommender.update(context, rec.action, feedback, rec.prob)
+        st.session_state.ctx_rounds += 1
+        st.session_state.ctx_likes += int(feedback)
+        st.session_state.ctx_need_new = True
+        st.rerun()
+
+    rounds = st.session_state.ctx_rounds
+    likes = st.session_state.ctx_likes
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Rounds", rounds)
+    m2.metric("Interested", likes)
+    m3.metric("Hit rate", f"{(likes / rounds):.0%}" if rounds else "—")
+
+    st.markdown("**What VW would recommend for your current context**")
+    probs = recommender.action_probabilities(context)
+    df = pd.DataFrame(
+        {
+            "Book": [b.label for b in books],
+            "Genre": [b.subject for b in books],
+            "Recommend probability": probs,
+            "Times shown": recommender.counts,
+        }
+    ).sort_values("Recommend probability", ascending=False)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+
+def _render_contextual_experiment(recommender, books: list, seed: int) -> None:
+    st.caption(
+        "Simulate many readers whose tastes depend on their genre preference. A "
+        "working contextual bandit learns to match each reader to their genre, so "
+        "regret flattens and the match-rate climbs."
+    )
+    personas = build_personas(books)
+    st.write("Reader personas (one per genre): " + ", ".join(
+        f"`{p.pref_genre}`" for p in personas
+    ))
+
+    n_rounds = st.slider("Number of readers (rounds)", 100, 5000, 1500, 100, key="ctx_rounds_slider")
+    if not st.button("Run experiment", type="primary", key="ctx_run"):
+        return
+
+    # Run on a throwaway recommender so the interactive model is untouched.
+    sim_rec = _build_recommender(
+        books,
+        {
+            "exploration": recommender.exploration,
+            "explore_param": recommender.epsilon
+            if recommender.exploration == "epsilon"
+            else recommender.softmax_lambda,
+            "interactions": recommender.interactions,
+        },
+        seed,
+    )
+    result = run_contextual_simulation(sim_rec, n_rounds, np.random.default_rng(seed), personas)
+
+    total_reward = int(np.sum(result.rewards))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total clicks", f"{total_reward}")
+    c2.metric("Average reward", f"{total_reward / n_rounds:.3f}")
+    c3.metric("Genre match rate", f"{result.match_rate:.0%}")
+
+    st.markdown("**Cumulative regret** — flattens as VW learns each reader's taste.")
+    st.line_chart(pd.DataFrame({"cumulative regret": result.cumulative_regret}))
+
+    st.markdown("**What VW recommends for each reader persona** (after training)")
+    rows = []
+    for p in personas:
+        probs = sim_rec.action_probabilities(p)
+        top = int(np.argmax(probs))
+        rows.append(
+            {
+                "Reader prefers": p.pref_genre,
+                "Top recommendation": books[top].label,
+                "Its genre": books[top].subject,
+                "Probability": f"{probs[top]:.0%}",
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+# --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
 def main() -> None:
@@ -218,7 +444,8 @@ def main() -> None:
     st.write(
         "A demo of how Multi-Armed Bandit algorithms balance **exploration** and "
         "**exploitation** to learn which books to recommend. Configure the "
-        "algorithm in the sidebar."
+        "algorithm in the sidebar. The **Contextual (VW)** tab goes further, using "
+        "Vowpal Wabbit to personalise recommendations to each reader's context."
     )
 
     cfg = sidebar_config()
@@ -238,11 +465,15 @@ def main() -> None:
             use_container_width=True, hide_index=True,
         )
 
-    sim_tab, interactive_tab = st.tabs(["Simulation", "Interactive"])
+    sim_tab, interactive_tab, contextual_tab = st.tabs(
+        ["Simulation", "Interactive", "Contextual (VW)"]
+    )
     with sim_tab:
         render_simulation(cfg, books)
     with interactive_tab:
         render_interactive(cfg, books)
+    with contextual_tab:
+        render_contextual(cfg)
 
 
 if __name__ == "__main__":
