@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 
 from mab_books.bandits import build_policy
-from mab_books.books import fetch_books, fetch_mixed_catalogue
+from mab_books.books import Book, fetch_books, fetch_mixed_catalogue
 from mab_books.contextual import (
     GENRE_OPTIONS,
     MOOD_OPTIONS,
@@ -29,6 +30,74 @@ from mab_books.simulation import assign_true_ctrs, run_simulation
 CONTEXTUAL_SUBJECTS = [g for g in GENRE_OPTIONS if g != "any"]
 
 st.set_page_config(page_title="MAB Book Recommender", page_icon="📚", layout="wide")
+
+
+# --------------------------------------------------------------------------- #
+# Cached data loaders
+#
+# Streamlit re-runs this whole script top-to-bottom on *every* widget
+# interaction (including each 👍/👎 click). Without caching, every rerun made a
+# fresh network call to Open Library for the catalogue *and* re-downloaded every
+# cover image — the main reason the app felt slow and images loaded late.
+# Caching makes repeat runs effectively instant.
+# --------------------------------------------------------------------------- #
+@st.cache_data(show_spinner=False)
+def load_books(subject: str, n_books: int) -> list[Book]:
+    """Fetch books once per (subject, n_books); cached across reruns."""
+    return fetch_books(subject, n_books)
+
+
+@st.cache_data(show_spinner=False)
+def load_mixed_catalogue(subjects: tuple[str, ...], per_subject: int) -> list[Book]:
+    """Fetch the multi-genre contextual catalogue once; cached across reruns.
+
+    Like :func:`load_books`, this keeps the contextual tab from re-hitting Open
+    Library on every 👍/👎 click.
+    """
+    return fetch_mixed_catalogue(list(subjects), per_subject=per_subject)
+
+
+@st.cache_data(show_spinner=False, ttl=24 * 3600)
+def load_cover(url: str) -> bytes | None:
+    """Download a cover image once and cache the bytes.
+
+    Returns ``None`` (so the caller can show a placeholder) if the image can't
+    be fetched. Cached for a day so repeat reruns never hit the network.
+    """
+    try:
+        resp = requests.get(url, timeout=4.0, headers={"User-Agent": "mab-books-demo/0.1"})
+        resp.raise_for_status()
+        return resp.content
+    except requests.RequestException:
+        return None
+
+
+def render_cover(book: Book, width: int = 120) -> None:
+    """Show a book's cover, falling back to a styled placeholder.
+
+    The first fetch for a given URL shows a spinner so the user gets immediate
+    feedback instead of a blank gap; subsequent reruns hit the cache and the
+    spinner never appears.
+    """
+    data = None
+    if book.cover_url:
+        with st.spinner("Loading cover…"):
+            data = load_cover(book.cover_url)
+    if data is not None:
+        st.image(data, width=width)
+        return
+    st.markdown(
+        f"""
+        <div style="width:{width}px;height:{int(width * 1.5)}px;border-radius:8px;
+                    background:linear-gradient(135deg,#6366f1,#a855f7);color:white;
+                    display:flex;align-items:center;justify-content:center;
+                    text-align:center;padding:8px;font-size:0.8rem;font-weight:600;
+                    box-shadow:0 2px 8px rgba(0,0,0,0.2);">
+            📖<br>{book.title}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -190,8 +259,7 @@ def render_interactive(cfg: dict, books: list) -> None:
 
     st.markdown(f"### 📖 Recommended: **{book.title}**")
     st.write(f"*by {book.author}*")
-    if book.cover_url:
-        st.image(book.cover_url, width=120)
+    render_cover(book, width=120)
 
     c1, c2 = st.columns(2)
     feedback = None
@@ -285,7 +353,7 @@ def render_contextual(cfg: dict) -> None:
         return
 
     with st.spinner("Loading a multi-genre catalogue…"):
-        books = fetch_mixed_catalogue(CONTEXTUAL_SUBJECTS, per_subject=4)
+        books = load_mixed_catalogue(tuple(CONTEXTUAL_SUBJECTS), 4)
     if not books:
         st.error("No books available for the contextual catalogue.")
         return
@@ -345,8 +413,7 @@ def _render_contextual_interactive(recommender, books: list) -> None:
     st.markdown(f"### 📖 Recommended: **{book.title}**")
     st.write(f"*by {book.author}*  ·  genre: `{book.subject}`")
     st.caption(f"VW showed this with probability {rec.prob:.0%} for your context.")
-    if book.cover_url:
-        st.image(book.cover_url, width=120)
+    render_cover(book, width=120)
 
     c1, c2 = st.columns(2)
     feedback = None
@@ -451,7 +518,7 @@ def main() -> None:
     cfg = sidebar_config()
 
     with st.spinner("Loading books…"):
-        books = fetch_books(cfg["subject"], cfg["n_books"])
+        books = load_books(cfg["subject"], cfg["n_books"])
 
     if not books:
         st.error("No books available. Try a different subject.")
